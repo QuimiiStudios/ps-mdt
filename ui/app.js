@@ -45,7 +45,7 @@ const AmbulanceJobs = {
 }
 
 const DojJobs = {
-  ['lawyer']: true,
+  ['doj']: true,
   ['judge']: true
 }
 
@@ -4907,7 +4907,7 @@ $(document).ready(() => {
       $(".vehicle-info-plate-input").val(table["plate"]);
       $(".vehicle-info-owner-input").val(table["name"]);
       $(".vehicle-info-class-input").val(table["class"]);
-      $(".vehicle-info-model-input").val(table["model"]);
+      $(".vehicle-info-model-input").val(table["modelName"]);
       $(".vehicle-info-imageurl-input").val(table["image"]);
       let vehiclePoints = table["points"] != null ? table["points"] : 0;
       $("#vehiclePointsSlider").val(vehiclePoints);
@@ -5288,6 +5288,8 @@ function searchProfilesResults(result) {
   let profileHTML = "";
 
   result.forEach((value) => {
+    let firname = value.firstname;
+    let lasname = value.lastname;
     let charinfo = value.charinfo;
     let metadata = value.licences;
 
@@ -5299,7 +5301,7 @@ function searchProfilesResults(result) {
       metadata = JSON.parse(metadata);
     }
 
-    let name = charinfo.firstname + " " + charinfo.lastname;
+    let name = firname + " " + lasname;
     let warrant = "red-tag";
     let convictions = "red-tag";
 
@@ -5337,7 +5339,7 @@ function searchProfilesResults(result) {
     }
 
     profileHTML += `
-                  <div class="profile-item" data-id="${value.citizenid}">
+                  <div class="profile-item" data-id="${value.identifier}">
                       <img src="${value.pp}" class="profile-image">
                       <div style="display: flex; flex-direction: column; margin-top: 2.5px; margin-left: 5px; width: 100%; padding: 5px;">
                       <div style="display: flex; flex-direction: column;">
@@ -5351,7 +5353,7 @@ function searchProfilesResults(result) {
                               </div>
                           </div>
                           <div class="profile-bottom-info">
-                              <div class="profile-id">ID: ${value.citizenid}</div>&nbsp;
+                              <div class="profile-id">ID: ${value.identifier}</div>&nbsp;
                           </div>
                       </div>
                   </div>

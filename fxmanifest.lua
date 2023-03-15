@@ -3,11 +3,15 @@ game 'gta5'
 
 author 'Flawws, Flakey, Idris and the Project Sloth team'
 description 'EchoRP MDT Rewrite for QBCore'
-version '1.7'
+version '1.6'
 
 lua54 'yes'
 
-shared_script 'shared/config.lua'
+shared_scripts { 
+	'@es_extended/imports.lua',
+	'@ox_lib/init.lua',
+    'shared/config.lua'
+}
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',

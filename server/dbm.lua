@@ -1,8 +1,6 @@
-local QBCore = exports['qb-core']:GetCoreObject()
-
 -- Get CitizenIDs from Player License
 function GetCitizenID(license)
-    local result = MySQL.query.await("SELECT citizenid FROM players WHERE license = ?", {license,})
+    local result = MySQL.query.await("SELECT citizenid FROM users WHERE license = ?", {license,})
     if result ~= nil then
         return result
     else
@@ -20,10 +18,10 @@ end
 
 function GetNameFromId(cid)
 	-- Should be a scalar?
-	local result = MySQL.scalar.await('SELECT charinfo FROM players WHERE citizenid = @citizenid', { ['@citizenid'] = cid })
+	local result = MySQL.query.await('SELECT firstname, lastname FROM users WHERE identifier = @identifier', { ['@identifier'] = cid })
     if result ~= nil then
-        local charinfo = json.decode(result)
-        local fullname = charinfo['firstname']..' '..charinfo['lastname']
+        --local charinfo = json.decode(result)
+        local fullname = result[1].firstname..' '..result[1].lastname
         return fullname
     else
         --print('Player does not exist')
@@ -52,7 +50,10 @@ function GetIncidentName(id)
 end
 
 function GetConvictions(cids)
-	return MySQL.query.await('SELECT * FROM `mdt_convictions` WHERE `cid` IN(?)', { cids })
+    print(cids[1])
+    result = MySQL.query.await('SELECT * FROM `mdt_convictions` WHERE cid = ?', {cids[1]})
+    print(ESX.DumpTable(result))
+	return result
 	-- return exports.oxmysql:executeSync('SELECT * FROM `mdt_convictions` WHERE `cid` IN(?)', { cids })
 end
 
@@ -69,7 +70,8 @@ function CreateUser(cid, tableName)
 end
 
 function GetPlayerVehicles(cid, cb)
-	return MySQL.query.await('SELECT id, plate, vehicle FROM player_vehicles WHERE citizenid=:cid', { cid = cid })
+    --print(cid)
+	return MySQL.query.await('SELECT plate, vehicle FROM owned_vehicles WHERE owner = @cid', { cid = cid })
 end
 
 function GetBulletins(JobType)
@@ -78,20 +80,23 @@ function GetBulletins(JobType)
 end
 
 function GetPlayerProperties(cid, cb)
-	local result =  MySQL.query.await('SELECT houselocations.label, houselocations.coords FROM player_houses INNER JOIN houselocations ON player_houses.house = houselocations.name where player_houses.citizenid = ?', {cid})
+	local result =  nil --TODO: Fix this MySQL.query.await('SELECT houselocations.label, houselocations.coords FROM player_houses INNER JOIN houselocations ON player_houses.house = houselocations.name where player_houses.citizenid = ?', {cid})
 	return result
 end
 
 function GetPlayerDataById(id)
-    local Player = QBCore.Functions.GetPlayerByCitizenId(id)
+    --print(id)
+    local Player = ESX.GetPlayerFromIdentifier(id)
+    --print(ESX.DumpTable(Player))
+    --print(Player.identifier)
     if Player ~= nil then
-		local response = {citizenid = Player.PlayerData.citizenid, charinfo = Player.PlayerData.charinfo, metadata = Player.PlayerData.metadata, job = Player.PlayerData.job}
+		local response = {identifier = Player.identifier, firstName = Player.variables.firstName, lastName = Player.variables.lastName, gender = Player.variables.sex, dateofbirth =  Player.variables.dateofbirth, job = Player.job}
         return response
     else
-        return MySQL.single.await('SELECT citizenid, charinfo, job, metadata FROM players WHERE citizenid = ? LIMIT 1', { id })
+        return MySQL.single.await('SELECT identifier, firstname, lastname, dateofbirth, job, job_grade FROM users WHERE identifier = ? LIMIT 1', { id })
     end
 
-	-- return exports.oxmysql:executeSync('SELECT citizenid, charinfo, job FROM players WHERE citizenid = ? LIMIT 1', { id })
+	-- return exports.oxmysql:executeSync('SELECT citizenid, charinfo, job FROM users WHERE citizenid = ? LIMIT 1', { id })
 end
 
 -- Probs also best not to use
@@ -123,33 +128,46 @@ end
 
 function GetPlayerLicenses(identifier)
     local response = false
-    local Player = QBCore.Functions.GetPlayerByCitizenId(identifier)
-    if Player ~= nil then
-        return Player.PlayerData.metadata.licences
-    else
-        local result = MySQL.scalar.await('SELECT metadata FROM players WHERE citizenid = @identifier', {['@identifier'] = identifier})
+    local Player = ESX.GetPlayerFromIdentifier(identifier)
+        local result = MySQL.query.await('SELECT * FROM `user_licenses` WHERE `owner` = @identifier', {['@identifier'] = identifier})
         if result ~= nil then
-            local metadata = json.decode(result)
-            if metadata["licences"] ~= nil and metadata["licences"] then
-                return metadata["licences"]
-            else
-                return {
-                    ['driver'] = false,
-                    ['business'] = false,
-                    ['weapon'] = false,
-                    ['pilot'] = false
-                }
+            local metadata = {}--json.decode(result)
+            for k, v in pairs(result) do
+                if v.type == 'boat' then
+                    metadata['boat'] = true
+                elseif v.type == 'drive' then
+                    metadata['driver'] = true
+                elseif v.type == 'weapon' then
+                    metadata['weapon'] = true
+                --[[elseif v.type == 'license_cardealer' then
+                    metadata['Car Dealer'] = true
+                elseif v.type == 'license_shop_general' then
+                    metadata['General Shop'] = true
+                elseif v.type == 'license_shop_ammunation' then
+                    metadata['Weapon Shop'] = true]]
+                elseif v.type == 'hunting' then
+                    metadata['hunting'] = true
+                elseif v.type == 'pilot' then
+                    metadata['pilot'] = true
+                end
             end
-        end
-    end
+            return metadata
+        else
+            return {
+                ['driver'] = false,
+                ['business'] = false,
+                ['weapon'] = false,
+                ['pilot'] = false
+            }
+         end
 end
 
 function ManageLicense(identifier, type, status)
-    local Player = QBCore.Functions.GetPlayerByCitizenId(identifier)
+    local Player = ESX.GetPlayerFromIdentifier(identifier)
     local licenseStatus = nil
     if status == "give" then licenseStatus = true elseif status == "revoke" then licenseStatus = false end
     if Player ~= nil then
-        local licences = Player.PlayerData.metadata["licences"]
+        local licences = Player.metadata["licences"]
         local newLicenses = {}
         for k, v in pairs(licences) do
             local status = v
@@ -166,12 +184,14 @@ function ManageLicense(identifier, type, status)
 end
 
 function ManageLicenses(identifier, incomingLicenses)
-    local Player = QBCore.Functions.GetPlayerByCitizenId(identifier)
+    local Player = ESX.GetPlayerFromIdentifier(identifier)
     if Player ~= nil then
-        Player.Functions.SetMetaData("licences", incomingLicenses)
+        print(ESX.DumpTable(incomingLicenses))
+        --Player.Functions.SetMetaData("licences", incomingLicenses)
 
     else
-        local result = MySQL.scalar.await('SELECT metadata FROM players WHERE citizenid = @identifier', {['@identifier'] = identifier})
+        local result = MySQL.scalar.await('SELECT * FROM `user_licenses` WHERE `owner` = @identifier', {['@identifier'] = identifier})
+        print(ESX.DumpTable(result))
         result = json.decode(result)
 
         result.licences = result.licences or {

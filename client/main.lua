@@ -1,4 +1,3 @@
-QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = {}
 local CurrentCops = 0
 local isOpen = false
@@ -18,24 +17,25 @@ CreateThread(function()
 end)
 
 
--- Events from qbcore
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-    PlayerData = QBCore.Functions.GetPlayerData()
-    callSign = PlayerData.metadata.callsign
+-- Events from esx
+RegisterNetEvent("esx:playerLoaded", function()
+    PlayerData = ESX.GetPlayerData()
+    callSign = PlayerData.callsign
 end)
 
-RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
-    TriggerServerEvent("ps-mdt:server:OnPlayerUnload")
+RegisterNetEvent('esx:onPlayerLogout', function()
+	TriggerServerEvent("ps-mdt:server:OnPlayerUnload")
     PlayerData = {}
 end)
 
-RegisterNetEvent('QBCore:Client:OnJobUpdate', function(JobInfo)
-    PlayerData.job = JobInfo
+RegisterNetEvent('esx:setJob')
+AddEventHandler('esx:setJob', function(job)
+	PlayerData.job = job
 end)
 
-RegisterNetEvent('QBCore:Client:OnGangUpdate', function(GangInfo)
+--[[RegisterNetEvent('QBCore:Client:OnGangUpdate', function(GangInfo)
     PlayerData.gang = GangInfo
-end)
+end)]]
 
 RegisterNetEvent("QBCore:Client:SetDuty", function(job, state)
     if AllowedJob(job) then
@@ -64,8 +64,8 @@ end)
 AddEventHandler('onResourceStart', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     Wait(150)
-    PlayerData = QBCore.Functions.GetPlayerData()
-    callSign = PlayerData.metadata.callsign
+    PlayerData = ESX.GetPlayerData()
+    callSign = PlayerData.callsign
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)
@@ -86,13 +86,13 @@ RegisterKeyMapping('mdt', 'Open Police MDT', 'keyboard', 'k')
 
 RegisterCommand('mdt', function()
     local plyPed = PlayerPedId()
-    PlayerData = QBCore.Functions.GetPlayerData()
-    if not PlayerData.metadata["isdead"] and not PlayerData.metadata["inlaststand"] and not PlayerData.metadata["ishandcuffed"] and not IsPauseMenuActive() then
+    PlayerData = ESX.GetPlayerData()
+    if not IsPauseMenuActive() then
         if GetJobType(PlayerData.job.name) ~= nil then
             TriggerServerEvent('mdt:server:openMDT')
         end
     else
-        QBCore.Functions.Notify("Can't do that!", "error")
+        ESX.ShowNotification("Can't do that!", "error") 
     end
 end, false)
 
@@ -200,7 +200,7 @@ RegisterNetEvent('mdt:client:dashboardbulletin', function(sentData)
 end)
 
 RegisterNetEvent('mdt:client:dashboardWarrants', function()
-    QBCore.Functions.TriggerCallback("mdt:server:getWarrants", function(data)
+    ESX.TriggerServerCallback("mdt:server:getWarrants", function(data)
         if data then
             SendNUIMessage({ type = "warrants", data = data })
         end
@@ -236,7 +236,7 @@ RegisterNetEvent('mdt:client:deleteBulletin', function(ignoreId, sentData, job)
     end
 end)
 
-RegisterNetEvent('mdt:client:open', function(bulletin, activeUnits, calls, cid)
+RegisterNetEvent('mdt:client:open', function(bulletin, activeUnits, calls, cid, fname, lname)
     EnableGUI(true)
     local x, y, z = table.unpack(GetEntityCoords(PlayerPedId()))
 
@@ -254,8 +254,7 @@ RegisterNetEvent('mdt:client:open', function(bulletin, activeUnits, calls, cid)
     else playerStreetsLocation = area end
 
     -- local grade = PlayerData.job.grade.name
-
-    SendNUIMessage({ type = "data", activeUnits = activeUnits, citizenid = cid, ondutyonly = Config.OnlyShowOnDuty, name = "Welcome, " ..PlayerData.job.grade.name..' '..PlayerData.charinfo.lastname:sub(1,1):upper()..PlayerData.charinfo.lastname:sub(2), location = playerStreetsLocation, fullname = PlayerData.charinfo.firstname..' '..PlayerData.charinfo.lastname, bulletin = bulletin })
+    SendNUIMessage({ type = "data", activeUnits = activeUnits, citizenid = cid, ondutyonly = Config.OnlyShowOnDuty, name = "Welcome, " ..PlayerData.job.grade_label..' '..fname..' '..lname, location = playerStreetsLocation, fullname = fname..' '..lname, bulletin = bulletin })
     SendNUIMessage({ type = "calls", data = calls })
     TriggerEvent("mdt:client:dashboardWarrants")
 end)
@@ -273,7 +272,7 @@ end)
 RegisterNUICallback("searchProfiles", function(data, cb)
     local p = promise.new()
 
-    QBCore.Functions.TriggerCallback('mdt:server:SearchProfile', function(result)
+    ESX.TriggerServerCallback('mdt:server:SearchProfile', function(result)
         p:resolve(result)
     end, data.name)
 
@@ -303,23 +302,24 @@ RegisterNUICallback("saveProfile", function(data, cb)
 end)
 
 RegisterNUICallback("getProfileData", function(data, cb)
+    --print(ESX.DumpTable(data))
     local id = data.id
     local p = nil
     local getProfileDataPromise = function(data)
         if p then return end
         p = promise.new()
-        QBCore.Functions.TriggerCallback('mdt:server:GetProfileData', function(result)
+        ESX.TriggerServerCallback('mdt:server:GetProfileData', function(result)
             p:resolve(result)
         end, data)
         return Citizen.Await(p)
     end
     local pP = nil
     local result = getProfileDataPromise(id)
-
+    --print(ESX.DumpTable(result))
     --[[ local getProfileProperties = function(data)
         if pP then return end
         pP = promise.new()
-        QBCore.Functions.TriggerCallback('qb-phone:server:MeosGetPlayerHouses', function(result)
+        ESX.TriggerServerCallback('qb-phone:server:MeosGetPlayerHouses', function(result)
             pP:resolve(result)
         end, data)
         return Citizen.Await(pP)
@@ -329,9 +329,10 @@ RegisterNUICallback("getProfileData", function(data, cb)
     ]]
     local vehicles=result.vehicles
     for i=1,#vehicles do
+        local vehDet = json.decode(ESX.DumpTable(result.vehicles[i]['vehicle']))
         local vehicle=result.vehicles[i]
-        local vehData = QBCore.Shared.Vehicles[vehicle['vehicle']]
-        result.vehicles[i]['model'] = vehData["name"]
+        local vehData = {}
+        result.vehicles[i]['model'] = exports['bdrp-vehiclenames']:getVehicleName(vehDet.model)
     end
     p = nil
     return cb(result)
@@ -391,7 +392,7 @@ RegisterNUICallback("sendToJail", function(data, cb)
 
     -- Gets the player id from the citizenId
     local p = promise.new()
-    QBCore.Functions.TriggerCallback('mdt:server:GetPlayerSourceId', function(result)
+    ESX.TriggerServerCallback('mdt:server:GetPlayerSourceId', function(result)
         p:resolve(result)
     end, citizenId)
 
@@ -411,7 +412,7 @@ RegisterNUICallback("sendFine", function(data, cb)
     
     -- Gets the player id from the citizenId
     local p = promise.new()
-    QBCore.Functions.TriggerCallback('mdt:server:GetPlayerSourceId', function(result)
+    ESX.TriggerServerCallback('mdt:server:GetPlayerSourceId', function(result)
         p:resolve(result)
     end, citizenId)
 
@@ -430,7 +431,7 @@ RegisterNUICallback("sendToCommunityService", function(data, cb)
 
     -- Gets the player id from the citizenId
     local p = promise.new()
-    QBCore.Functions.TriggerCallback('mdt:server:GetPlayerSourceId', function(result)
+    ESX.TriggerServerCallback('mdt:server:GetPlayerSourceId', function(result)
         p:resolve(result)
     end, citizenId)
 
@@ -465,6 +466,7 @@ RegisterNetEvent('mdt:client:getIncidentData', function(sentData, sentConviction
 end)
 
 RegisterNetEvent('mdt:client:incidentSearchPerson', function(sentData)
+    --print(ESX.DumpTable(sentData))
     SendNUIMessage({ type = "incidentSearchPerson", data = sentData })
 end)
 
@@ -475,7 +477,7 @@ RegisterNUICallback('SetHouseLocation', function(data, cb)
         coords[#coords+1] = tonumber(word)
     end
     SetNewWaypoint(coords[1], coords[2])
-    QBCore.Functions.Notify('GPS has been set!', 'success')
+    ESX.ShowNotification('GPS has been set!', 'success')
 end)
 
 --====================================================================================
@@ -630,23 +632,24 @@ RegisterNUICallback("searchVehicles", function(data, cb)
 
     local p = promise.new()
 
-    QBCore.Functions.TriggerCallback('mdt:server:SearchVehicles', function(result)
+    ESX.TriggerServerCallback('mdt:server:SearchVehicles', function(result)
         p:resolve(result)
     end, data.name)
 
     local result = Citizen.Await(p)
     for i=1, #result do
         local vehicle = result[i]
-        local mods = json.decode(result[i].mods)
+        local mods = json.decode(result[i].vehicle)
         result[i]['plate'] = string.upper(result[i]['plate'])
         result[i]['color'] = Config.ColorInformation[mods['color1']]
         result[i]['colorName'] = Config.ColorNames[mods['color1']]
-        local vehData = QBCore.Shared.Vehicles[vehicle['vehicle']]
-        result[i]['model'] = vehData["brand"] .. ' ' .. vehData["name"]
+        result[i]['image'] = exports.vImageCreator:GetModelImage(mods.model)
+        result[i]['model'] = exports['bdrp-vehiclenames']:getVehicleName(mods.model)
     end
     cb(result)
 
 end)
+
 
 RegisterNUICallback("getVehicleData", function(data, cb)
     local plate = data.plate
@@ -684,7 +687,7 @@ RegisterNUICallback("saveVehicleInfo", function(data, cb)
             end
 
             if found == 0 then
-                QBCore.Functions.Notify('Vehicle not found!', 'error')
+                ESX.ShowNotification('Vehicle not found!', 'error')
                 SendNUIMessage({ type = "redImpound" })
             end
         else
@@ -712,7 +715,7 @@ end)
 RegisterNUICallback("searchWeapons", function(data, cb)
     local p = promise.new()
 
-    QBCore.Functions.TriggerCallback('mdt:server:SearchWeapons', function(result)
+    ESX.TriggerServerCallback('mdt:server:SearchWeapons', function(result)
         p:resolve(result)
     end, data.name)
 
@@ -763,7 +766,9 @@ RegisterNUICallback("toggleDuty", function(data, cb)
 end)
 
 RegisterNUICallback("setCallsign", function(data, cb)
-    TriggerServerEvent('mdt:server:setCallsign', data.cid, data.newcallsign)
+    ESX.SetPlayerData("callsign", data.newcallsign)
+    LocalPlayer.state:set("callsign", data.newcallsign, true)
+    --TriggerServerEvent('mdt:server:setCallsign', data.cid, data.newcallsign)
     cb(true)
 end)
 
@@ -788,8 +793,8 @@ RegisterNetEvent('mdt:client:getVehicleData', function(sentData)
         local vehData = json.decode(vehicle['vehicle'])
         vehicle['color'] = Config.ColorInformation[vehicle['color1']]
         vehicle['colorName'] = Config.ColorNames[vehicle['color1']]
-        local vehData = QBCore.Shared.Vehicles[vehicle.vehicle]
-        vehicle.model = vehData["brand"] .. ' ' .. vehData["name"]
+        vehicle['image'] = exports.vImageCreator:GetModelImage(vehData.model)
+        vehicle['modelName'] = exports['bdrp-vehiclenames']:getVehicleName(vehData.model)
         vehicle['class'] = Config.ClassList[GetVehicleClassFromName(vehicle['vehicle'])]
         vehicle['vehicle'] = nil
         SendNUIMessage({ type = "getVehicleData", data = vehicle })
@@ -816,9 +821,9 @@ RegisterNetEvent('mdt:client:setRadio', function(radio)
     if type(tonumber(radio)) == "number" then
         exports["pma-voice"]:setVoiceProperty("radioEnabled", true)
         exports["pma-voice"]:setRadioChannel(tonumber(radio))
-        QBCore.Functions.Notify("You have set your radio frequency to "..radio..".", "success")
+        ESX.ShowNotification("You have set your radio frequency to "..radio..".", "success")
     else
-        QBCore.Functions.Notify("Invalid Station(Please enter a number)", "error")
+        ESX.ShowNotification("Invalid Station(Please enter a number)", "error")
     end
 end)
 
@@ -851,10 +856,10 @@ end)
 --====================================================================================
 
 RegisterNetEvent('dispatch:clNotify', function(sNotificationData, sNotificationId)
-    if LocalPlayer.state.isLoggedIn then
-        sNotificationData.playerJob = PlayerData.job.name
+    --if LocalPlayer.state.isLoggedIn then
+        sNotificationData.playerJob = ESX.GetPlayerData().job.name
         SendNUIMessage({ type = "call", data = sNotificationData })
-    end
+    --end
 end)
 
 RegisterNUICallback("setWaypoint", function(data, cb)
@@ -958,7 +963,7 @@ end)
         end
 
         if found == 0 then
-            QBCore.Functions.Notify('Vehicle not found!', 'error')
+            ESX.ShowNotification('Vehicle not found!', 'error')
             return
         end
 
@@ -1043,4 +1048,8 @@ end)
 
 RegisterNetEvent('mdt:client:statusImpound', function(data, plate)
     SendNUIMessage({ type = "statusImpound", data = data, plate = plate })
+end)
+
+RegisterCommand('talert', function()
+    exports['ps-dispatch']:DrugSale()
 end)

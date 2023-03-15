@@ -1,8 +1,6 @@
-local QBCore = exports['qb-core']:GetCoreObject()
-
 function GetPlayerData(source)
-	local Player = QBCore.Functions.GetPlayer(source)
-	return Player.PlayerData
+	local Player = ESX.GetPlayerFromId(source)
+	return Player
 end
 
 function UnpackJob(data)
@@ -11,7 +9,7 @@ function UnpackJob(data)
 		label = data.label
 	}
 	local grade = {
-		name = data.grade.name,
+		name = data.grade_label,
 	}
 
 	return job, grade
@@ -47,5 +45,5 @@ function IsJobAllowedToMDT(job)
 end
 
 function GetNameFromPlayerData(PlayerData)
-	return ('%s %s'):format(PlayerData.charinfo.firstname, PlayerData.charinfo.lastname)
+	return ('%s %s'):format(PlayerData.variables.firstName, PlayerData.variables.lastName)
 end

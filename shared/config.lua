@@ -13,7 +13,7 @@ Config.RosterLink = {
 }
 
 
-Config.UseWolfknightRadar = false
+Config.UseWolfknightRadar = true
 Config.WolfknightNotifyTime = 5000 --How long the notification displays for in milliseconds (30000 = 30 seconds)
 --[[
 Adds support for Wraith ARS 2X by WolfKnight98 (wk_wars2x)
@@ -257,11 +257,11 @@ Config.PoliceJobs = {
 
 Config.AmbulanceJobs = {
     ['ambulance'] = true,
-    ['doctor'] = true
+    ['firerescue'] = true
 }
 
 Config.DojJobs = {
-    ['lawyer'] = true,
+    ['doj'] = true,
     ['judge'] = true
 }
 
@@ -284,6 +284,7 @@ Config.LogPerms = {
 	},
 	['police'] = {
 		[4] = true,
+        [23] = true,
 	},
     ['bcso'] = {
 		[4] = true,
