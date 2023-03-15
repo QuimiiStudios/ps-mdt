@@ -183,7 +183,7 @@ function ManageLicense(identifier, type, status)
     end
 end
 
-function ManageLicenses(identifier, incomingLicenses)
+function UpdateAllLicenses(identifier, incomingLicenses)
     local Player = ESX.GetPlayerFromIdentifier(identifier)
     if Player ~= nil then
         print(ESX.DumpTable(incomingLicenses))

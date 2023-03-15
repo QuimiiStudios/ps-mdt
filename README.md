@@ -57,3 +57,11 @@ The below repos are direct forks of ps-mdt and have been edited to fit certain c
 
 EchoRP MDT Released by Flawws#9999 from Echo RP rewritten and restructured for QBCore. 
 This is no longer a fork so we are able to open issues on this repo.
+
+## Weapon Info Export
+
+Adds server export for inserting weaponinfo records, that can be used elsewhere in your server, such as weapon purchase, to add information to the mdt. Below is the syntax for this, all arguments are strings.
+
+```
+exports['ps-mdt']:CreateWeaponInfo(serial, imageurl, notes, owner, weapClass, weapModel)
+```
